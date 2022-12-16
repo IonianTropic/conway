@@ -3,6 +3,11 @@
 const SIZE: (usize, usize) = (64, 36);
 
 fn main() {
+    let updates_per_second = 20;
+
+    let mut time_of_last_update = std::time::Instant::now();
+    let static_update_pause = std::time::Duration::from_millis(1000 / updates_per_second);
+    let mut update_pause = static_update_pause;
     
     let event_loop = winit::event_loop::EventLoop::new();
 
@@ -15,6 +20,8 @@ fn main() {
     let mut pixels = pixels::Pixels::new(SIZE.0 as u32, SIZE.1 as u32, surface_texture).unwrap();
 
     let mut game_state = [Cell::Dead; SIZE.0*SIZE.1];
+
+    let mut mouse_position = (0.0, 0.0);
 
     // tub
     game_state[SIZE.0*1+2] = Cell::Alive;
@@ -30,7 +37,6 @@ fn main() {
     let mut paused = true;
     
     event_loop.run(move |event, _, control_flow| {
-        control_flow.set_wait_until(std::time::Instant::now().checked_add(std::time::Duration::from_millis(200)).unwrap());
         match event {
             winit::event::Event::WindowEvent { event, .. } => match event {
                 winit::event::WindowEvent::Resized(psize) => {
@@ -47,14 +53,33 @@ fn main() {
                 } => {
                     paused = !paused;
                 }
+                winit::event::WindowEvent::CursorMoved { position, .. } => {
+                    mouse_position.0 = position.cast().x;
+                    mouse_position.1 = position.cast().y;
+                }
+                winit::event::WindowEvent::MouseInput {
+                    state: winit::event::ElementState::Pressed,
+                    button: winit::event::MouseButton::Left,
+                    .. 
+                } => {
+                    if let Ok(pixel_pos) = pixels.window_pos_to_pixel(mouse_position) {
+                        game_state[SIZE.0*pixel_pos.1+pixel_pos.0].toggle();
+                        window.request_redraw();
+                    }
+                }
                 winit::event::WindowEvent::CloseRequested => control_flow.set_exit(),
                 _ => (),
             }
             winit::event::Event::MainEventsCleared => {
-                if !paused {
+                if time_of_last_update.elapsed() >= update_pause && !paused {
+                    time_of_last_update = std::time::Instant::now();
                     update_state(&mut game_state);
+                    update_pause = match static_update_pause.checked_sub(time_of_last_update.elapsed()) {
+                        Some(d) => d,
+                        None => std::time::Duration::ZERO,
+                    };
+                    window.request_redraw();
                 }
-                window.request_redraw();
             }
             winit::event::Event::RedrawRequested(_) => {
                 write_game_state(&game_state, &mut pixels, SIZE);
@@ -76,6 +101,12 @@ impl Cell {
         match self {
             Cell::Alive => Rgba(0xff, 0xff, 0, 0xff),
             Cell::Dead => Rgba(0, 0, 0xff, 0xff),
+        }
+    }
+    fn toggle(&mut self) {
+        match self {
+            Cell::Alive => *self = Cell::Dead,
+            Cell::Dead => *self = Cell::Alive,
         }
     }
 }
