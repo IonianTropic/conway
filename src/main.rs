@@ -8,13 +8,13 @@ fn main() {
     let mut time_of_last_update = std::time::Instant::now();
     let static_update_pause = std::time::Duration::from_millis(1000 / updates_per_second);
     let mut update_pause = static_update_pause;
-    
+
     let event_loop = winit::event_loop::EventLoop::new();
 
     let window = winit::window::Window::new(&event_loop).unwrap();
 
     let initial_size = window.inner_size();
-    
+
     let surface_texture = pixels::SurfaceTexture::new(initial_size.width, initial_size.height, &window);
 
     let mut pixels = pixels::Pixels::new(SIZE.0 as u32, SIZE.1 as u32, surface_texture).unwrap();
